@@ -10,6 +10,8 @@
 #define SYS_WRITE 2
 #define SYS_MMAP 3
 #define SYS_ARCH_PRCTL 4
+#define SYS_OPEN 5
+#define SYS_CLOSE 6
 
 #define STUB()                                                                                     \
 	({                                                                                             \
@@ -76,7 +78,12 @@ void Sysdeps<Exit>::operator()(int status) {
 	__builtin_unreachable();
 }
 
-int Sysdeps<Close>::operator()(int) { STUB(); }
+int Sysdeps<Close>::operator()(int fd) {
+    auto out = syscall(SYS_CLOSE, fd);
+    if (out < 0)
+        return out;
+    return 0;
+}
 
 int Sysdeps<FutexWake>::operator()(int *, bool) { STUB(); }
 int Sysdeps<FutexWait>::operator()(int *, int, timespec const *) { STUB(); }
@@ -90,7 +97,13 @@ int Sysdeps<Read>::operator()(int fd, void *buffer, unsigned long buffer_size, l
     return 0;
 }
 
-int Sysdeps<Open>::operator()(const char *, int, unsigned int, int *) { STUB(); }
+int Sysdeps<Open>::operator()(const char *path, int flags, mode_t mode, int *fd) {
+    auto out = syscall(SYS_OPEN, fd, buffer, buffer_size);
+    if (out < 0)
+        return out;
+    *fd = (int) out;
+    return 0;
+}
 
 int Sysdeps<VmMap>::operator()(void *hint, size_t size, int prot, int flags, int fd, off_t offset, void **window) {
     auto out = syscall(
