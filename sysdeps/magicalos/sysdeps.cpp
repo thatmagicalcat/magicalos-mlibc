@@ -98,7 +98,7 @@ int Sysdeps<Read>::operator()(int fd, void *buffer, unsigned long buffer_size, l
 }
 
 int Sysdeps<Open>::operator()(const char *path, int flags, mode_t mode, int *fd) {
-    auto out = syscall(SYS_OPEN, fd, buffer, buffer_size);
+    auto out = syscall(SYS_OPEN, path, flags, mode);
     if (out < 0)
         return out;
     *fd = (int) out;
