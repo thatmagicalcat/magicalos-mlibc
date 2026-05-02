@@ -1,5 +1,6 @@
 #pragma once
 
+#include "mlibc/sysdep-tags.hpp"
 #include <mlibc/sysdep-signatures.hpp>
 
 namespace mlibc {
@@ -21,7 +22,9 @@ struct DemoSysdepTags :
 	Open,
 	VmMap,
 	VmUnmap,
-	ClockGet
+	ClockGet,
+    Sleep,
+    Mkdir
 {};
 
 template<typename Tag>

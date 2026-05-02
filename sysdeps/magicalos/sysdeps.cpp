@@ -12,6 +12,10 @@
 #define SYS_ARCH_PRCTL 4
 #define SYS_OPEN 5
 #define SYS_CLOSE 6
+#define SYS_CLOCKGET 7
+#define SYS_SLEEP 8
+#define SYS_SEEK 9
+#define SYS_MKDIR 10
 
 #define STUB()                                                                                     \
 	({                                                                                             \
@@ -71,7 +75,16 @@ int Sysdeps<AnonFree>::operator()(void *, unsigned long) {
     return 0; // no-op, for now
 }
 
-int Sysdeps<Seek>::operator()(int, off_t, int, off_t *) { return ESPIPE; }
+ int Sysdeps<Seek>::operator()(int fd, off_t offset, int whence, off_t *new_offset) {
+       auto out = syscall(SYS_SEEK, fd, offset, whence);
+
+       if (out < 0)
+           return -out;
+       if (new_offset)
+           *new_offset = out;
+
+       return 0;
+   }
 
 void Sysdeps<Exit>::operator()(int status) {
 	syscall(SYS_EXIT);
@@ -118,6 +131,28 @@ int Sysdeps<VmMap>::operator()(void *hint, size_t size, int prot, int flags, int
 }
 
 int Sysdeps<VmUnmap>::operator()(void *, size_t) { STUB(); }
-int Sysdeps<ClockGet>::operator()(int, time_t *, long *) { STUB(); }
+int Sysdeps<ClockGet>::operator()(int clock, time_t *secs, long *nanos) {
+    auto out = syscall(SYS_CLOCKGET, secs, nanos);
+    if (out < 0)
+        return out;
+    return 0;
+}
+
+int Sysdeps<Sleep>::operator()(time_t *secs, long *nanos) {
+    time_t s = secs ? *secs : 0;
+    long n = nanos ? *nanos : 0;
+    
+    auto out = syscall(SYS_SLEEP, s, n);
+    if (out < 0)
+        return out;
+    return 0;
+}
+
+int Sysdeps<Mkdir>::operator()(const char *path, mode_t mode) {
+    auto out = syscall(SYS_MKDIR, path, mode);
+    if (out < 0)
+        return -out;
+    return 0;
+}
 
 } // namespace mlibc
