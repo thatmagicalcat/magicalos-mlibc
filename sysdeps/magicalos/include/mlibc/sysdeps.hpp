@@ -24,7 +24,8 @@ struct DemoSysdepTags :
 	VmUnmap,
 	ClockGet,
     Sleep,
-    Mkdir
+    Mkdir,
+    Fork
 {};
 
 template<typename Tag>

@@ -16,6 +16,7 @@
 #define SYS_SLEEP 8
 #define SYS_SEEK 9
 #define SYS_MKDIR 10
+#define SYS_FORK 11
 
 #define STUB()                                                                                     \
 	({                                                                                             \
@@ -26,23 +27,23 @@
 namespace mlibc {
 
 void Sysdeps<LibcPanic>::operator()() {
-    sysdep<LibcLog>("!!! mlibc panic !!!");
-    sysdep<Exit>(-1);
-    __builtin_trap();
+	sysdep<LibcLog>("!!! mlibc panic !!!");
+	sysdep<Exit>(-1);
+	__builtin_trap();
 }
 
 void Sysdeps<LibcLog>::operator()(const char *msg) {
-    ssize_t unused;
-    sysdep<Write>(2, msg, strlen(msg), &unused);
-    char crlf[] = "\r\n";
-    sysdep<Write>(2, crlf, 2, &unused);
+	ssize_t unused;
+	sysdep<Write>(2, msg, strlen(msg), &unused);
+	char crlf[] = "\r\n";
+	sysdep<Write>(2, crlf, 2, &unused);
 }
 
 int Sysdeps<Isatty>::operator()(int fd) {
-    (void)fd;
-    // this returns ENOTTY when it is not a tty, but we do not have a proper implementation
-    // so always return that a file is a tty
-    return 0;
+	(void)fd;
+	// this returns ENOTTY when it is not a tty, but we do not have a proper implementation
+	// so always return that a file is a tty
+	return 0;
 }
 
 int Sysdeps<Write>::operator()(int fd, void const *buf, size_t size, ssize_t *ret) {
@@ -53,38 +54,39 @@ int Sysdeps<Write>::operator()(int fd, void const *buf, size_t size, ssize_t *re
 }
 
 int Sysdeps<TcbSet>::operator()(void *pointer) {
-    auto ret = syscall(SYS_ARCH_PRCTL, 0x1002 /* ARCH_SET_FS */, pointer);
-    if(ret < 0)
-        return ret;
-    return 0;
+	auto ret = syscall(SYS_ARCH_PRCTL, 0x1002 /* ARCH_SET_FS */, pointer);
+	if (ret < 0)
+		return ret;
+	return 0;
+}
+
+int Sysdeps<Fork>::operator()(pid_t *child) {
+	auto ret = syscall(SYS_FORK);
+	if (ret < 0)
+		return ret;
+	return 0;
 }
 
 int Sysdeps<AnonAllocate>::operator()(size_t size, void **pointer) {
-    return sysdep<VmMap>(
-        nullptr,
-        size,
-        PROT_READ | PROT_WRITE,
-        MAP_PRIVATE | MAP_ANONYMOUS,
-        -1,
-        0,
-        pointer
-    );
+	return sysdep<VmMap>(
+	    nullptr, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0, pointer
+	);
 }
 
 int Sysdeps<AnonFree>::operator()(void *, unsigned long) {
-    return 0; // no-op, for now
+	return 0; // no-op, for now
 }
 
- int Sysdeps<Seek>::operator()(int fd, off_t offset, int whence, off_t *new_offset) {
-       auto out = syscall(SYS_SEEK, fd, offset, whence);
+int Sysdeps<Seek>::operator()(int fd, off_t offset, int whence, off_t *new_offset) {
+	auto out = syscall(SYS_SEEK, fd, offset, whence);
 
-       if (out < 0)
-           return -out;
-       if (new_offset)
-           *new_offset = out;
+	if (out < 0)
+		return -out;
+	if (new_offset)
+		*new_offset = out;
 
-       return 0;
-   }
+	return 0;
+}
 
 void Sysdeps<Exit>::operator()(int status) {
 	syscall(SYS_EXIT);
@@ -92,67 +94,67 @@ void Sysdeps<Exit>::operator()(int status) {
 }
 
 int Sysdeps<Close>::operator()(int fd) {
-    auto out = syscall(SYS_CLOSE, fd);
-    if (out < 0)
-        return out;
-    return 0;
+	auto out = syscall(SYS_CLOSE, fd);
+	if (out < 0)
+		return out;
+	return 0;
 }
 
 int Sysdeps<FutexWake>::operator()(int *, bool) { STUB(); }
 int Sysdeps<FutexWait>::operator()(int *, int, timespec const *) { STUB(); }
 
 int Sysdeps<Read>::operator()(int fd, void *buffer, unsigned long buffer_size, long *bytes_read) {
-    auto out = syscall(SYS_READ, fd, buffer, buffer_size);
-    if (out < 0)
-        return out;
+	auto out = syscall(SYS_READ, fd, buffer, buffer_size);
+	if (out < 0)
+		return out;
 
-    *bytes_read = (long) out;
-    return 0;
+	*bytes_read = (long)out;
+	return 0;
 }
 
 int Sysdeps<Open>::operator()(const char *path, int flags, mode_t mode, int *fd) {
-    auto out = syscall(SYS_OPEN, path, flags, mode);
-    if (out < 0)
-        return out;
-    *fd = (int) out;
-    return 0;
+	auto out = syscall(SYS_OPEN, path, flags, mode);
+	if (out < 0)
+		return out;
+	*fd = (int)out;
+	return 0;
 }
 
-int Sysdeps<VmMap>::operator()(void *hint, size_t size, int prot, int flags, int fd, off_t offset, void **window) {
-    auto out = syscall(
-        SYS_MMAP, hint, size, prot, flags, fd, offset
-    );
+int Sysdeps<VmMap>::operator()(
+    void *hint, size_t size, int prot, int flags, int fd, off_t offset, void **window
+) {
+	auto out = syscall(SYS_MMAP, hint, size, prot, flags, fd, offset);
 
-    if (out < 0)
-        return out;
+	if (out < 0)
+		return out;
 
-    *window = (void *)out;
-    return 0;
+	*window = (void *)out;
+	return 0;
 }
 
 int Sysdeps<VmUnmap>::operator()(void *, size_t) { STUB(); }
 int Sysdeps<ClockGet>::operator()(int clock, time_t *secs, long *nanos) {
-    auto out = syscall(SYS_CLOCKGET, secs, nanos);
-    if (out < 0)
-        return out;
-    return 0;
+	auto out = syscall(SYS_CLOCKGET, secs, nanos);
+	if (out < 0)
+		return out;
+	return 0;
 }
 
 int Sysdeps<Sleep>::operator()(time_t *secs, long *nanos) {
-    time_t s = secs ? *secs : 0;
-    long n = nanos ? *nanos : 0;
-    
-    auto out = syscall(SYS_SLEEP, s, n);
-    if (out < 0)
-        return out;
-    return 0;
+	time_t s = secs ? *secs : 0;
+	long n = nanos ? *nanos : 0;
+
+	auto out = syscall(SYS_SLEEP, s, n);
+	if (out < 0)
+		return out;
+	return 0;
 }
 
 int Sysdeps<Mkdir>::operator()(const char *path, mode_t mode) {
-    auto out = syscall(SYS_MKDIR, path, mode);
-    if (out < 0)
-        return -out;
-    return 0;
+	auto out = syscall(SYS_MKDIR, path, mode);
+	if (out < 0)
+		return -out;
+	return 0;
 }
 
 } // namespace mlibc
